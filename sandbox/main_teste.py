@@ -7,10 +7,8 @@ from streamlit_folium import st_folium
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-##vs. 0.9
-
 st.set_page_config(page_title="Mapa do Barulho - Belém", layout="wide")
-st.title("📍 Registro de Barulho em Belém 0.9")
+st.title("📍 Registro de Barulho em Belém 1.0 ")
 
 # =========================
 # Configuração Google Sheets

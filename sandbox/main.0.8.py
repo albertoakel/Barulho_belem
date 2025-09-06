@@ -4,52 +4,31 @@ import datetime
 from geopy.geocoders import Nominatim
 import folium
 from streamlit_folium import st_folium
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
-##vs. 0.9
 
 st.set_page_config(page_title="Mapa do Barulho - Belém", layout="wide")
-st.title("📍 Registro de Barulho em Belém 0.9")
+st.title("📍 Registro de Barulho em Belém")
 
-# =========================
-# Configuração Google Sheets
-# =========================
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
-client = gspread.authorize(creds)
+# Inicializa DataFrame
+if "registros" not in st.session_state:
+    st.session_state["registros"] = pd.DataFrame(columns=[
+        "Data", "Endereço", "Latitude", "Longitude", "Origem", "Frequência",
+        "Intensidade", "Horário", "Duração_horas", "dB", "Observações"
+    ])
 
-# Abrir planilha
-SHEET_NAME = "BarulhoBelem_DB"
-sheet = client.open(SHEET_NAME).sheet1
-
-def salvar_registro(dados):
-    sheet.append_row(dados)
-
-def carregar_registros():
-    registros = sheet.get_all_records()
-    return pd.DataFrame(registros)
-
-def limpar_registros():
-    sheet.clear()
-    sheet.append_row(["Data", "Endereço", "Latitude", "Longitude", "Origem",
-                      "Frequência", "Intensidade", "Horário", "Duração_horas",
-                      "dB", "Observações"])
-
-# =========================
-# Geolocalização inicial
-# =========================
 geolocator = Nominatim(user_agent="barulho_belem")
+
+# Coordenadas iniciais de Belém
 latitude, longitude = -1.455833, -48.503889
 endereco = ""
+
+# =========================
+# Entrada manual de endereço
+# =========================
+st.subheader("📌 Informe o local do barulho")
 
 if "endereco_input" not in st.session_state:
     st.session_state["endereco_input"] = ""
 
-# =========================
-# Entrada manual
-# =========================
-st.subheader("📌 Informe o local do barulho")
 endereco_input = st.text_input(
     "Digite o endereço (Rua, nº, bairro, CEP) - opcional:",
     value=st.session_state["endereco_input"]
@@ -72,7 +51,7 @@ st.subheader("🗺️ Ou clique no mapa para marcar a localização")
 
 m = folium.Map(location=[latitude, longitude], zoom_start=13)
 folium.Marker([latitude, longitude], tooltip="Local selecionado").add_to(m)
-map_data = st_folium(m, height=400, width=700)
+map_data = st_folium(m, height=600, width=1200)
 
 if map_data and map_data["last_clicked"]:
     latitude = map_data["last_clicked"]["lat"]
@@ -113,38 +92,42 @@ with st.form("registro_barulho"):
 
     enviado = st.form_submit_button("Salvar registro")
 
+# =========================
+# Salvar registro
+# =========================
 if enviado:
     if st.session_state["endereco_input"]:
-        novo_registro = [
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            st.session_state["endereco_input"],
-            latitude,
-            longitude,
-            origem,
-            frequencia,
-            intensidade,
-            ", ".join(horario),
-            duracao,
-            decibeis if decibeis > 0 else "",
-            observacoes
-        ]
-        salvar_registro(novo_registro)
-        st.success("✅ Obrigado pelo Registro!")
+        novo_registro = {
+            "Data": datetime.datetime.now(),
+            "Endereço": st.session_state["endereco_input"],
+            "Latitude": latitude,
+            "Longitude": longitude,
+            "Origem": origem,
+            "Frequência": frequencia,
+            "Intensidade": intensidade,
+            "Horário": ", ".join(horario),
+            "Duração_horas": duracao,
+            "dB": decibeis if decibeis > 0 else None,
+            "Observações": observacoes
+        }
+        st.session_state["registros"] = pd.concat(
+            [st.session_state["registros"], pd.DataFrame([novo_registro])],
+            ignore_index=True
+        )
+
+        # ======== Salvar CSV com timestamp ========
+        path = '/home/akel/PycharmProjects/Barulho_belem/data/raw/'
+        timestamp = datetime.datetime.now().strftime("%d.%m.%Y_%H_%M_%S")
+        filename = f"reg_{timestamp}.csv"
+        st.session_state["registros"].to_csv(path+filename, index=False)
+        st.success(f"✅ Registro salvo com sucesso! ")
+        #st.success(f"✅ Registro salvo com sucesso! Arquivo: `{filename}`")
+
     else:
         st.error("⚠️ Nenhum endereço selecionado. Informe ou clique no mapa.")
 
 # =========================
 # Mostrar registros
 # =========================
-#st.subheader("📊 Registros realizados")
-#df = carregar_registros()
-#st.dataframe(df)
-
-# Botão para baixar registros em CSV
-#csv_bytes = df.to_csv(index=False).encode("utf-8")
-#st.download_button("⬇️ Baixar registros em CSV", csv_bytes, "registros.csv", "text/csv")
-
-# Botão para limpar planilha
-if st.button("🗑️ Limpar registros"):
-    limpar_registros()
-    st.warning("Todos os registros foram apagados.")
+st.subheader("📊 Registros realizados")
+st.dataframe(st.session_state["registros"])
