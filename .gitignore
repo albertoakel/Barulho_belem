@@ -1,0 +1,16 @@
+# Diretórios temporários
+**/.virtual_documents/
+**/.ipynb_checkpoints/
+**/__pycache__/
+.ipynb_checkpoints/
+.virtual_documents/
+__pycache__/
+.idea/
+
+# Pastas de configuração do Streamlit
+Dashboard/.streamlit/
+sandbox/.streamlit/
+
+# Credenciais
+config/*.json
+

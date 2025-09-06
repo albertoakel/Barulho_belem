@@ -1,5 +1,7 @@
 folium==0.19.6
 geopy==2.4.1
+gspread
+oauth2client
 pandas==2.2.2
 streamlit
 streamlit_folium
