@@ -147,10 +147,10 @@ with tab_form:
 # =========================
 # Opções avançadas
 # =========================
-with st.expander("Opções avançadas"):
-    if st.button("🗑️ Limpar registros"):
-        limpar_registros()
-        st.warning("Todos os registros foram apagados.")
+# with st.expander("Opções avançadas"):
+#     if st.button("🗑️ Limpar registros"):
+#         limpar_registros()
+#         st.warning("Todos os registros foram apagados.")
 
 
 # import streamlit as st
@@ -299,7 +299,7 @@ with st.expander("Opções avançadas"):
 # #csv_bytes = df.to_csv(index=False).encode("utf-8")
 # #st.download_button("⬇️ Baixar registros em CSV", csv_bytes, "registros.csv", "text/csv")
 #
-# # Botão para limpar planilha
-# if st.button("🗑️ Limpar registros"):
-#     limpar_registros()
-#     st.warning("Todos os registros foram apagados.")
+## # Botão para limpar planilha
+## if st.button("🗑️ Limpar registros"):
+##     limpar_registros()
+##     st.warning("Todos os registros foram apagados.")
