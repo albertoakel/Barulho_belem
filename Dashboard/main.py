@@ -11,7 +11,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 
 import streamlit as st
-
+print(st.secrets["gcp_service_account"]["project_id"])
 #vs_cel
 # =========================
 # Configurações da página
@@ -25,7 +25,7 @@ st.title("📍 Registro de Barulho em Belém 0.9")
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
 client = gspread.authorize(creds)
-SHEET_NAME = "BarulhoBelem_DB"
+SHEET_NAME = "BarulhoBelem"
 sheet = client.open(SHEET_NAME).sheet1
 
 def salvar_registro(dados):
