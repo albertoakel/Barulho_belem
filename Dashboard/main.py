@@ -1,12 +1,16 @@
 import streamlit as st
 import pandas as pd
 import datetime
-from geopy.geocoders import Nominatim
+#from geopy.geocoders import Nominatim
+from opencage.geocoder import OpenCageGeocode
+
 import folium
 from streamlit_folium import st_folium
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+
+import streamlit as st
 
 #vs_cel
 # =========================
@@ -40,7 +44,8 @@ def limpar_registros():
 # =========================
 # Geolocalização inicial
 # =========================
-geolocator = Nominatim(user_agent="barulho_belem")
+#geolocator = Nominatim(user_agent="barulho_belem")
+geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API"]["OPENCAGE_API_KEY"])
 latitude, longitude = -1.455833, -48.503889
 endereco = ""
 
@@ -64,10 +69,14 @@ with tab_mapa:
     )
 
     if endereco_input and endereco_input != st.session_state["endereco_input"]:
-        location = geolocator.geocode(endereco_input)
-        if location:
-            latitude, longitude = location.latitude, location.longitude
-            endereco = location.address
+        #location = geolocator.geocode(endereco_input)
+        result = geocoder.geocode(endereco_input)
+        if result:
+            latitude = result[0]['geometry']['lat']
+            longitude = result[0]['geometry']['lng']
+            endereco = result[0]['formatted']
+            #latitude, longitude = location.latitude, location.longitude
+            #endereco = location.address
             st.session_state["endereco_input"] = endereco
             st.success(f"Endereço localizado: {endereco}")
         else:
@@ -82,9 +91,11 @@ with tab_mapa:
         latitude = map_data["last_clicked"]["lat"]
         longitude = map_data["last_clicked"]["lng"]
         try:
-            location = geolocator.reverse((latitude, longitude), language="pt")
-            if location:
-                endereco = location.address
+            #location = geolocator.reverse((latitude, longitude), language="pt")
+            result = geocoder.reverse_geocode(latitude, longitude, language='pt')
+            if result:
+                endereco = result[0]['formatted']
+                #endereco = location.address
                 st.session_state["endereco_input"] = endereco
                 st.info(f"Endereço aproximado (mapa): {endereco}")
             else:
