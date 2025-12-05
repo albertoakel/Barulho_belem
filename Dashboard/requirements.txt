@@ -1,4 +1,6 @@
 folium==0.20.0
 pandas==2.2.3
+setup_pth
+src
 streamlit==1.41.1
 streamlit_folium==0.25.1
