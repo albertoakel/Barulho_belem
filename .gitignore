@@ -1,6 +1,7 @@
 # Diretórios temporários
 **/.virtual_documents/
 **/.ipynb_checkpoints/
+**/.devcontainer/
 **/__pycache__/
 .ipynb_checkpoints/
 .virtual_documents/
