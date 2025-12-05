@@ -29,11 +29,3 @@ def salvar_registro(sheet, dados):
 def carregar_registros(sheet):
     registros = sheet.get_all_records()
     return pd.DataFrame(registros)
-
-def limpar_registros(sheet):
-    sheet.clear()
-    sheet.append_row([
-        "Data", "Endereço", "Latitude", "Longitude", "Origem",
-        "Frequência", "Intensidade", "Horário", "Duração_horas",
-        "dB", "Observações"
-    ])
