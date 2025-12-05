@@ -1,113 +1,142 @@
 import streamlit as st
 import pandas as pd
 import datetime
-#from geopy.geocoders import Nominatim
-from opencage.geocoder import OpenCageGeocode
 
 import folium
 from streamlit_folium import st_folium
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
+from setup_pth import setup_path
+setup_path()
+from src.google_sheets import *
+from src.geocode_belem import *
 
-import streamlit as st
-print(st.secrets["gcp_service_account"]["project_id"])
-#vs_cel
 # =========================
 # Configurações da página
 # =========================
 st.set_page_config(page_title="Mapa do Barulho - Belém", layout="wide")
-st.title("📍 Registro de Barulho em Belém 0.9")
+st.title("📍 Registro de Barulho em Belém 0.92")
+
+sheet = conectar_sheets("BarulhoBelem")
 
 # =========================
-# Google Sheets
+# Estado Inicial
 # =========================
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
-client = gspread.authorize(creds)
-SHEET_NAME = "BarulhoBelem"
-sheet = client.open(SHEET_NAME).sheet1
+if "lat" not in st.session_state:
+    st.session_state.lat = -1.455833
 
-def salvar_registro(dados):
-    sheet.append_row(dados)
+if "lon" not in st.session_state:
+    st.session_state.lon = -48.503889
 
-def carregar_registros():
-    registros = sheet.get_all_records()
-    return pd.DataFrame(registros)
-
-def limpar_registros():
-    sheet.clear()
-    sheet.append_row(["Data", "Endereço", "Latitude", "Longitude", "Origem",
-                      "Frequência", "Intensidade", "Horário", "Duração_horas",
-                      "dB", "Observações"])
-
-# =========================
-# Geolocalização inicial
-# =========================
-#geolocator = Nominatim(user_agent="barulho_belem")
-geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API"]["OPENCAGE_API_KEY"])
-latitude, longitude = -1.455833, -48.503889
-endereco = ""
+if "endereco" not in st.session_state:
+    st.session_state.endereco = ""
 
 if "endereco_input" not in st.session_state:
-    st.session_state["endereco_input"] = ""
+    st.session_state.endereco_input = ""
+
+if "trigger_map_update" not in st.session_state:
+    st.session_state.trigger_map_update = False
+
+
+if "mensagem_formulario" not in st.session_state:
+    st.session_state.mensagem_formulario = ""
+
 
 # =========================
-# Tabs para melhor UX
+# Tabs
 # =========================
 tab_mapa, tab_form = st.tabs(["🗺️ Mapa", "📋 Formulário"])
 
-# =========================
-# Tab Mapa
-# =========================
+
+# =========================================================
+# 🗺️ TAB MAPA
+# =========================================================
 with tab_mapa:
     st.subheader("Selecione a localização do barulho")
+
     endereco_input = st.text_input(
         "Digite o endereço (opcional):",
-        value=st.session_state["endereco_input"],
-        placeholder="Ex: Rua XYZ, 123, Bairro ABC, CEP"
+        value=st.session_state.endereco_input,
+        placeholder="Ex: Rua Padre Eutíquio, 100"
     )
 
-    if endereco_input and endereco_input != st.session_state["endereco_input"]:
-        #location = geolocator.geocode(endereco_input)
-        result = geocoder.geocode(endereco_input)
-        if result:
-            latitude = result[0]['geometry']['lat']
-            longitude = result[0]['geometry']['lng']
-            endereco = result[0]['formatted']
-            #latitude, longitude = location.latitude, location.longitude
-            #endereco = location.address
-            st.session_state["endereco_input"] = endereco
-            st.success(f"Endereço localizado: {endereco}")
-        else:
-            st.warning("Endereço não encontrado. Clique no mapa para selecionar.")
+    # --- BUSCA PELO ENDEREÇO DIGITADO ---
+    if endereco_input and endereco_input != st.session_state.endereco_input:
 
-    # Mapa responsivo
-    m = folium.Map(location=[latitude, longitude], zoom_start=13)
-    folium.Marker([latitude, longitude], tooltip="Local selecionado").add_to(m)
+        busca = buscar_endereco_belem(endereco_input)
+
+        if busca is None:
+            st.warning("Endereço não encontrado. Tente ser mais específico.")
+        elif busca is False:
+            st.error("Endereço encontrado, mas fora de Belém. Corrija novamente.")
+        else:
+            lat, lon, endereco = busca
+
+            # Atualiza estado global
+            st.session_state.lat = lat
+            st.session_state.lon = lon
+            st.session_state.endereco = endereco
+            st.session_state.endereco_input = endereco
+            st.session_state.trigger_map_update = True
+
+            st.success(f"Endereço localizado: {endereco}")
+            st.session_state.mensagem_formulario = "➡️ Agora vá para a aba **Formulário** para finalizar o envio."
+            #st.info("➡️ Agora vá para a aba **Formulário** para finalizar o envio.")
+    if st.session_state.mensagem_formulario:
+        st.info(st.session_state.mensagem_formulario)
+
+    # --- RENDER DO MAPA ---
+    m = folium.Map(
+        location=[st.session_state.lat, st.session_state.lon],
+        tiles="CartoDB Positron",
+        zoom_start=14
+    )
+
+    folium.Marker(
+        [st.session_state.lat, st.session_state.lon],
+        tooltip="Local selecionado"
+    ).add_to(m)
+
     map_data = st_folium(m, height=400, width="100%")
 
-    if map_data and map_data["last_clicked"]:
-        latitude = map_data["last_clicked"]["lat"]
-        longitude = map_data["last_clicked"]["lng"]
-        try:
-            #location = geolocator.reverse((latitude, longitude), language="pt")
-            result = geocoder.reverse_geocode(latitude, longitude, language='pt')
-            if result:
-                endereco = result[0]['formatted']
-                #endereco = location.address
-                st.session_state["endereco_input"] = endereco
-                st.info(f"Endereço aproximado (mapa): {endereco}")
-            else:
-                endereco = "Não encontrado"
-        except:
-            endereco = "Erro na geocodificação"
+    # --- CLIQUE NO MAPA ---
+    if map_data and map_data.get("last_clicked"):
+        lat_click = map_data["last_clicked"]["lat"]
+        lng_click = map_data["last_clicked"]["lng"]
 
-# =========================
-# Tab Formulário
-# =========================
+        endereco_click = reverse_buscando_belem(lat_click, lng_click)
+
+        if endereco_click is None:
+            st.warning("Não foi possível identificar endereço neste ponto.")
+        elif endereco_click is False:
+            st.error("O ponto clicado não está em Belém. Escolha outro.")
+        else:
+            st.session_state.lat = lat_click
+            st.session_state.lon = lng_click
+            st.session_state.endereco = endereco_click
+            st.session_state.endereco_input = endereco_click
+
+            st.info(f"Endereço aproximado (mapa): {endereco_click}")
+            st.info("➡️ Agora vá para a aba **Formulário** para finalizar o envio.")
+
+        st.session_state.trigger_map_update = True
+
+
+# =========================================================
+# TAB FORMULÁRIO
+# =========================================================
 with tab_form:
     st.subheader("Informe os detalhes do barulho")
+
+    # =========================
+    # NOVO → mostrar endereço escolhido
+    # =========================
+    st.markdown("### 📌 Endereço selecionado:")
+    if st.session_state.endereco:
+        st.success(st.session_state.endereco)
+    else:
+        st.warning("Nenhum endereço selecionado ainda. Escolha na aba **Mapa**.")
+        st.stop()
+
     with st.form("registro_barulho"):
         # Colunas para melhor visualização em celular
         col1, col2 = st.columns(2)
@@ -126,6 +155,7 @@ with tab_form:
                 "Todos os dias", "Todos os finais de semana", "Ocasionalmente"
             ])
             intensidade = st.radio("Nível de incômodo", ["Baixo", "Médio", "Alto"], horizontal=True)
+
         with col2:
             horario = st.multiselect("Período em que mais ocorre", ["Manhã", "Tarde", "Noite", "Madrugada"])
             duracao = st.slider("Duração média (horas)", 0.0, 12.0, 1.0, step=0.5)
@@ -136,181 +166,18 @@ with tab_form:
         enviado = st.form_submit_button("✅ Salvar registro")
 
     if enviado:
-        if st.session_state["endereco_input"]:
-            novo_registro = [
-                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                st.session_state["endereco_input"],
-                latitude,
-                longitude,
-                origem,
-                frequencia,
-                intensidade,
-                ", ".join(horario),
-                duracao,
-                decibeis if decibeis > 0 else "",
-                observacoes
-            ]
-            salvar_registro(novo_registro)
-            st.success("✅ Registro salvo com sucesso!")
-        else:
-            st.error("⚠️ Nenhum endereço selecionado. Informe ou clique no mapa.")
-
-# =========================
-# Opções avançadas
-# =========================
-# with st.expander("Opções avançadas"):
-#     if st.button("🗑️ Limpar registros"):
-#         limpar_registros()
-#         st.warning("Todos os registros foram apagados.")
-
-
-# import streamlit as st
-# import pandas as pd
-# import datetime
-# from geopy.geocoders import Nominatim
-# import folium
-# from streamlit_folium import st_folium
-# import gspread
-# from oauth2client.service_account import ServiceAccountCredentials
-#
-# ##vs. 0.9
-#
-# st.set_page_config(page_title="Mapa do Barulho - Belém", layout="wide")
-# st.title("📍 Registro de Barulho em Belém 0.9")
-#
-# # =========================
-# # Configuração Google Sheets
-# # =========================
-# scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-# creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
-# client = gspread.authorize(creds)
-#
-# # Abrir planilha
-# SHEET_NAME = "BarulhoBelem_DB"
-# sheet = client.open(SHEET_NAME).sheet1
-#
-# def salvar_registro(dados):
-#     sheet.append_row(dados)
-#
-# def carregar_registros():
-#     registros = sheet.get_all_records()
-#     return pd.DataFrame(registros)
-#
-# def limpar_registros():
-#     sheet.clear()
-#     sheet.append_row(["Data", "Endereço", "Latitude", "Longitude", "Origem",
-#                       "Frequência", "Intensidade", "Horário", "Duração_horas",
-#                       "dB", "Observações"])
-#
-# # =========================
-# # Geolocalização inicial
-# # =========================
-# geolocator = Nominatim(user_agent="barulho_belem")
-# latitude, longitude = -1.455833, -48.503889
-# endereco = ""
-#
-# if "endereco_input" not in st.session_state:
-#     st.session_state["endereco_input"] = ""
-#
-# # =========================
-# # Entrada manual
-# # =========================
-# st.subheader("📌 Informe o local do barulho")
-# endereco_input = st.text_input(
-#     "Digite o endereço (Rua, nº, bairro, CEP) - opcional:",
-#     value=st.session_state["endereco_input"]
-# )
-#
-# if endereco_input and endereco_input != st.session_state["endereco_input"]:
-#     location = geolocator.geocode(endereco_input)
-#     if location:
-#         latitude, longitude = location.latitude, location.longitude
-#         endereco = location.address
-#         st.session_state["endereco_input"] = endereco
-#         st.success(f"Endereço localizado: {endereco}")
-#     else:
-#         st.warning("Endereço não encontrado. Clique no mapa para selecionar.")
-#
-# # =========================
-# # Mapa interativo
-# # =========================
-# st.subheader("🗺️ Ou clique no mapa para marcar a localização")
-#
-# m = folium.Map(location=[latitude, longitude], zoom_start=13)
-# folium.Marker([latitude, longitude], tooltip="Local selecionado").add_to(m)
-# map_data = st_folium(m, height=400, width=700)
-#
-# if map_data and map_data["last_clicked"]:
-#     latitude = map_data["last_clicked"]["lat"]
-#     longitude = map_data["last_clicked"]["lng"]
-#     try:
-#         location = geolocator.reverse((latitude, longitude), language="pt")
-#         if location:
-#             endereco = location.address
-#             st.session_state["endereco_input"] = endereco
-#             st.info(f"Endereço aproximado (mapa): {endereco}")
-#         else:
-#             endereco = "Não encontrado"
-#     except:
-#         endereco = "Erro na geocodificação"
-#
-# # =========================
-# # Formulário de registro
-# # =========================
-# with st.form("registro_barulho"):
-#     origem = st.selectbox("Origem do barulho", [
-#         "Som de carro (propaganda)",
-#         "Autofalantes em residências",
-#         "Festa em bares",
-#         "Paredão, Trio e Aparelhagens",
-#         "Trânsito intenso (ônibus, motos, buzinas)",
-#         "Obras/Construção",
-#         "Eventos públicos (igreja, procissão, shows)",
-#         "Outros"
-#     ])
-#     frequencia = st.selectbox("Frequência", [
-#         "Todos os dias", "Todos os finais de semana", "Ocasionalmente"
-#     ])
-#     intensidade = st.radio("Nível de incômodo", ["Baixo", "Médio", "Alto"])
-#     horario = st.multiselect("Período em que mais ocorre", ["Manhã", "Tarde", "Noite", "Madrugada"])
-#     duracao = st.slider("Duração média (horas)", 0.0, 12.0, 1.0, step=0.5)
-#     decibeis = st.number_input("Medição aproximada (dB) - opcional", min_value=0, max_value=150, step=1)
-#     observacoes = st.text_area("Observações adicionais")
-#
-#     enviado = st.form_submit_button("Salvar registro")
-#
-# if enviado:
-#     if st.session_state["endereco_input"]:
-#         novo_registro = [
-#             datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-#             st.session_state["endereco_input"],
-#             latitude,
-#             longitude,
-#             origem,
-#             frequencia,
-#             intensidade,
-#             ", ".join(horario),
-#             duracao,
-#             decibeis if decibeis > 0 else "",
-#             observacoes
-#         ]
-#         salvar_registro(novo_registro)
-#         st.success("✅ Obrigado pelo Registro!")
-#     else:
-#         st.error("⚠️ Nenhum endereço selecionado. Informe ou clique no mapa.")
-#
-# # =========================
-# # Mostrar registros
-# # =========================
-# #st.subheader("📊 Registros realizados")
-# #df = carregar_registros()
-# #st.dataframe(df)
-#
-# # Botão para baixar registros em CSV
-# #csv_bytes = df.to_csv(index=False).encode("utf-8")
-# #st.download_button("⬇️ Baixar registros em CSV", csv_bytes, "registros.csv", "text/csv")
-#
-## # Botão para limpar planilha
-## if st.button("🗑️ Limpar registros"):
-##     limpar_registros()
-##     st.warning("Todos os registros foram apagados.")
+        novo_registro = [
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            st.session_state.endereco,
+            st.session_state.lat,
+            st.session_state.lon,
+            origem,
+            frequencia,
+            intensidade,
+            ", ".join(horario),
+            duracao,
+            decibeis if decibeis > 0 else "",
+            observacoes
+        ]
+        salvar_registro(sheet, novo_registro)
+        st.success("✅ Registro salvo com sucesso! Obrigado pela contribuição.")
