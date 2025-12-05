@@ -1,6 +1,8 @@
 folium==0.20.0
 pandas==2.2.3
 setup_pth
-src
 streamlit==1.41.1
 streamlit_folium==0.25.1
+opencage==3.2.0
+gspread==6.2.1
+oauth2client==4.1.3
