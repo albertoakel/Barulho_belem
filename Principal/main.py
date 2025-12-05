@@ -40,7 +40,6 @@ if "trigger_map_update" not in st.session_state:
 if "mensagem_formulario" not in st.session_state:
     st.session_state.mensagem_formulario = ""
 
-
 # =========================
 # Tabs
 # =========================

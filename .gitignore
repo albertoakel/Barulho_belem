@@ -9,7 +9,7 @@ __pycache__/
 .idea/
 
 # Pastas de configuração do Streamlit
-Dashboard/.streamlit/
+Principal/.streamlit/
 sandbox/.streamlit/
 
 # Credenciais
