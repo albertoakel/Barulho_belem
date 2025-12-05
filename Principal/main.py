@@ -5,7 +5,7 @@ import datetime
 import folium
 from streamlit_folium import st_folium
 
-from setup_pth import setup_path
+from setup import setup_path
 setup_path()
 from src.google_sheets import *
 from src.geocode_belem import *
