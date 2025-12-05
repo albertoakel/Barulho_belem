@@ -49,21 +49,6 @@ O Barulho Belém nasce para transformar relatos individuais em **informação ge
   * frequência (Diário, Fins de semana, Ocasional);
   * horário e observações.
 
-* **Geocodifica automaticamente** endereços usando OpenCage.
-
-* **Armazena dados** em Google Sheets para persistência.
-
-* **Exibe mapa interativo** com:
-
-  * todos os pontos reportados;
-  * concentração de ocorrências;
-  * análise exploratória inicial.
-
-* **Organiza o código em módulos** claros:
-
-  * geocodificação (OpenCage),
-  * integração com Google Sheets,
-  * interface e UX no Streamlit.
 
 ---
 
