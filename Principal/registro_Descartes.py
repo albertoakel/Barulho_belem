@@ -163,11 +163,7 @@ with tab_form:
             st.session_state.lat,
             st.session_state.lon,
             origem,
-            frequencia,
-            intensidade,
             ", ".join(horario),
-            duracao,
-            decibeis if decibeis > 0 else "",
             observacoes
         ]
         salvar_registro(sheet, novo_registro)
